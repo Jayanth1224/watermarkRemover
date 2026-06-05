@@ -255,8 +255,8 @@
                     <span x-text="previewLoading ? (t.buttons?.preview_loading || '🔄 Detecting...') : (t.buttons?.preview || '🔍 Preview')"></span>
                 </button>
 
-                <!-- Video Settings Section (only for video files, AI mode only) -->
-                <div x-show="isVideoFile(inputPath) && detectionMode === 'ai'" x-transition
+                <!-- Video Settings Section (only for video files) -->
+                <div x-show="isVideoFile(inputPath)" x-transition
                      class="space-y-3 p-3 bg-purple-900/20 rounded-xl border border-purple-500/30">
                     <div class="text-xs font-bold text-purple-400 uppercase flex items-center gap-2">
                         <span>🎬</span> <span x-text="t.video_settings?.title || 'Video Settings'"></span>
@@ -271,9 +271,10 @@
                         </select>
                     </div>
 
-                    <!-- Detection Skip Slider -->
-                    <div class="space-y-1">
-                        <div class="flex justify-between text-xs font-mono">
+                    <div x-show="detectionMode === 'ai'" class="space-y-3">
+                        <!-- Detection Skip Slider -->
+                        <div class="space-y-1">
+                            <div class="flex justify-between text-xs font-mono">
                             <span class="text-purple-300" x-text="t.video_settings?.detection_skip?.label || 'Detection Skip'"></span>
                             <span x-text="detectionSkip + ' ' + (t.video_settings?.detection_skip?.unit || 'frames')"></span>
                         </div>
@@ -302,6 +303,7 @@
                         <input type="range" min="0" max="2" step="0.1" x-model="fadeOut" @change="saveConfigDebounced()"
                                class="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-purple-500">
                         <div class="text-[9px] text-gray-500" x-text="t.video_settings?.fade_out?.hint || ''"></div>
+                    </div>
                     </div>
                 </div>
 
@@ -1090,6 +1092,7 @@
                                 detection_skip: parseInt(this.detectionSkip) || 1,
                                 fade_in: parseFloat(this.fadeIn) || 0,
                                 fade_out: parseFloat(this.fadeOut) || 0,
+                                video_model: this.videoModel,
                                 // UI settings
                                 theme: this.theme,
                                 lang: this.lang

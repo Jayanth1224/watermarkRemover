@@ -366,8 +366,13 @@ class Api:
             cmd.append(f'--fade-out={float(fade_out)}')
 
         video_model = settings.get('video_model', 'lama')
+        print(f"[DEBUG] video_model from settings: '{video_model}'")
+        print(f"[DEBUG] Full settings keys: {list(settings.keys())}")
         if video_model == 'propainter':
             cmd.append('--video-model=propainter')
+            print(f"[DEBUG] Added --video-model=propainter to cmd")
+        else:
+            print(f"[DEBUG] Using default LaMA (video_model='{video_model}')")
 
         # Manual mask mode
         detection_mode = settings.get('detection_mode', 'ai')

@@ -606,9 +606,13 @@ def handle_one(image_path: Path, output_path: Path, florence_model, florence_pro
 
     # Check if it's a video file
     if is_video_file(image_path):
+        print(f"[DEBUG remwm.py handle_one] video_model='{video_model}', is_video=True")
         if video_model == "propainter":
+            print(f"[DEBUG remwm.py] >>> ROUTING TO PROPAINTER <<<")
             logger.info("Routing video to ProPainter pipeline...")
             return process_video_with_propainter_pipeline(image_path, output_path, florence_model, florence_processor, device, transparent, max_bbox_percent, force_format, detection_prompt, detection_skip, fade_in, fade_out, manual_mask_bboxes)
+        else:
+            print(f"[DEBUG remwm.py] >>> ROUTING TO LAMA (default) <<<")
 
         if manual_mask_bboxes:
             # Manual mode: single pass with fixed mask on every frame
@@ -673,6 +677,7 @@ def handle_one(image_path: Path, output_path: Path, florence_model, florence_pro
 @click.option("--manual-mask", default=None, type=str, help="JSON string of manual mask bounding boxes [[x1,y1,x2,y2],...]. Skips AI detection when provided.")
 @click.option("--video-model", default="lama", type=click.Choice(["lama", "propainter"]), help="Inpainting model to use for videos.")
 def main(input_path: str, output_path: str, preview: bool, overwrite: bool, transparent: bool, max_bbox_percent: float, force_format: str, detection_prompt: str, detection_skip: int, fade_in: float, fade_out: float, manual_mask: str, video_model: str):
+    print(f"[DEBUG remwm.py] video_model received by CLI: '{video_model}'")
     # Input validation
     if detection_skip < 1 or detection_skip > 10:
         logger.warning(f"detection_skip must be 1-10, got {detection_skip}. Using 1.")
@@ -836,7 +841,7 @@ def main(input_path: str, output_path: str, preview: bool, overwrite: bool, tran
             else:
                 output_file = output_file.with_suffix(".mp4")  # Default to mp4
 
-        handle_one(input_path, output_file, florence_model, florence_processor, model_manager, device, transparent, max_bbox_percent, force_format, overwrite, detection_prompt, detection_skip, fade_in, fade_out, manual_mask_bboxes=manual_mask_bboxes)
+        handle_one(input_path, output_file, florence_model, florence_processor, model_manager, device, transparent, max_bbox_percent, force_format, overwrite, detection_prompt, detection_skip, fade_in, fade_out, manual_mask_bboxes=manual_mask_bboxes, video_model=video_model)
         print(f"input_path:{input_path}, output_path:{output_file}, overall_progress:100")
 
 if __name__ == "__main__":

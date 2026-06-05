@@ -13,17 +13,56 @@ import tempfile
 import platform
 from loguru import logger
 
-# Add ProPainter to sys.path so we can import its modules
+# Import ProPainter modules explicitly to avoid collision with project's own utils.py
 propainter_path = os.path.join(os.path.dirname(__file__), "third_party", "ProPainter")
-if propainter_path not in sys.path:
-    sys.path.insert(0, propainter_path)
+
+# Temporarily prepend ProPainter path, import what we need, then restore
+_original_path = sys.path.copy()
+sys.path.insert(0, propainter_path)
+
+# Remove the project directory from path temporarily so Python doesn't find our utils.py
+_project_dir = os.path.dirname(os.path.abspath(__file__))
+sys.path = [p for p in sys.path if os.path.abspath(p) != _project_dir]
 
 from model.modules.flow_comp_raft import RAFT_bi
 from model.recurrent_flow_completion import RecurrentFlowCompleteNet
 from model.propainter import InpaintGenerator
 from utils.download_util import load_file_from_url
-from core.utils import to_tensors
 from model.misc import get_device
+
+# Restore original sys.path
+sys.path = _original_path
+
+# Inline reimplementation of to_tensors from ProPainter's core/utils.py
+# to avoid importing matplotlib (which that file requires but we don't need)
+class _Stack:
+    def __call__(self, img_group):
+        mode = img_group[0].mode
+        if mode == '1':
+            img_group = [img.convert('L') for img in img_group]
+            mode = 'L'
+        if mode == 'L':
+            return np.stack([np.expand_dims(x, 2) for x in img_group], axis=2)
+        elif mode == 'RGB':
+            return np.stack(img_group, axis=2)
+        else:
+            raise NotImplementedError(f"Image mode {mode}")
+
+class _ToTorchFormatTensor:
+    def __init__(self, div=True):
+        self.div = div
+    def __call__(self, pic):
+        if isinstance(pic, np.ndarray):
+            img = torch.from_numpy(pic).permute(2, 3, 0, 1).contiguous()
+        else:
+            img = torch.ByteTensor(torch.ByteStorage.from_buffer(pic.tobytes()))
+            img = img.view(pic.size[1], pic.size[0], len(pic.mode))
+            img = img.transpose(0, 1).transpose(0, 2).contiguous()
+        img = img.float().div(255) if self.div else img.float()
+        return img
+
+def to_tensors():
+    return torchvision.transforms.Compose([_Stack(), _ToTorchFormatTensor()])
 
 # OS Detection and Hardware Setup
 # Force MPS fallback if on Apple Silicon to handle unsupported correlation layers
@@ -88,6 +127,8 @@ def process_video_propainter(frames_pil, masks_pil, device):
     frames_pil: List of PIL images.
     masks_pil: List of PIL masks (L mode).
     """
+    if isinstance(device, str):
+        device = torch.device(device)
     use_half = True if device.type == 'cuda' else False
     
     size = frames_pil[0].size
