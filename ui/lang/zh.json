@@ -9,6 +9,20 @@
     "batch": "开银趴",
     "batch_tooltip": "大家一起上，甚至连甚至都在甚至 🥵"
   },
+  "detection_mode": {
+    "label": "\u6574\u6d3b\u65b9\u5f0f",
+    "ai": "\ud83e\udd16 AI\u81ea\u52a8\u6574",
+    "ai_tooltip": "\u8ba9AI\u5e2e\u4f60\u627e\u6c34\u5370\uff0c\ud83d\udc74\u5148\u6478\u4f1a\u513f\u9c7c\u3002",
+    "manual": "\u270f\ufe0f \u81ea\u5df1\u52a8\u624b",
+    "manual_tooltip": "\u81ea\u5df1\u753b\u6846\u6846\u6807\u8bb0\u6c34\u5370\uff0c\u6bd4AI\u8fd8\u51c6\uff08\uff1f\uff09",
+    "draw_hint": "\u70b9\u51fb\u62d6\u52a8\u753b\u6846\u6846",
+    "clear": "\u5168\u90e8\u6e05\u9664",
+    "undo": "\u64a4\u56de",
+    "change_file": "\u6362\u4e00\u4e2a",
+    "masks_count": "\u4e2a\u6846\u6846",
+    "loading": "\u52a0\u8f7d\u4e2d...",
+    "no_masks": "\u5148\u753b\u4e2a\u6846\u6846\u518d\u8bf4\uff0c\u522b\u5149\u770b\u7740\u554a\uff01"
+  },
   "settings": {
     "gaslight": {
       "label": "毁尸灭迹",

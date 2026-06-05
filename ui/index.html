@@ -190,6 +190,17 @@
                 </div>
             </div>
 
+            <!-- DETECTION MODE SELECTOR -->
+            <div class="space-y-2">
+                <label class="text-xs font-bold text-neon-green uppercase tracking-wider" x-text="t.detection_mode?.label || 'Detection Mode'"></label>
+                <div class="grid grid-cols-2 gap-2">
+                    <button @click="switchDetectionMode('ai')" :data-tooltip="t.detection_mode?.ai_tooltip || ''" :class="detectionMode=='ai' ? 'bg-neon-cyan text-black shadow-[0_0_15px_#00f3ff]' : 'bg-white/5 hover:bg-white/10 text-gray-400'" class="p-2.5 rounded-xl font-black text-xs transition-all border border-white/10" x-text="t.detection_mode?.ai || '🤖 AI Detection'">
+                    </button>
+                    <button @click="switchDetectionMode('manual')" :data-tooltip="t.detection_mode?.manual_tooltip || ''" :class="detectionMode=='manual' ? 'bg-neon-pink text-black shadow-[0_0_15px_#ff006e]' : 'bg-white/5 hover:bg-white/10 text-gray-400'" class="p-2.5 rounded-xl font-black text-xs transition-all border border-white/10" x-text="t.detection_mode?.manual || '✏️ Manual Mask'">
+                    </button>
+                </div>
+            </div>
+
             <!-- SETTINGS -->
             <div class="space-y-4 flex-1">
 
@@ -209,8 +220,8 @@
                     </button>
                 </div>
 
-                <!-- Slider -->
-                <div class="space-y-2 pt-2">
+                <!-- Slider (AI mode only) -->
+                <div x-show="detectionMode === 'ai'" x-transition class="space-y-2 pt-2">
                     <div class="flex justify-between text-xs font-mono">
                         <span class="text-neon-cyan cursor-help" :data-tooltip="t.settings?.sigma_detect?.tooltip || ''" x-text="t.settings?.sigma_detect?.label || 'Max Size'"></span>
                         <span x-text="detection + '%'">10%</span>
@@ -218,8 +229,8 @@
                     <input type="range" min="1" max="100" x-model="detection" @change="saveConfigDebounced()" class="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-neon-cyan">
                 </div>
 
-                <!-- Detection Prompt -->
-                <div class="space-y-1">
+                <!-- Detection Prompt (AI mode only) -->
+                <div x-show="detectionMode === 'ai'" x-transition class="space-y-1">
                     <label class="text-[10px] text-gray-500 uppercase cursor-help" :data-tooltip="t.settings?.detection_prompt?.tooltip || ''" x-text="t.settings?.detection_prompt?.label || 'Detection Prompt'"></label>
                     <input type="text" x-model="detectionPrompt" list="prompt-suggestions" @change="saveConfigDebounced()"
                            :placeholder="t.settings?.detection_prompt?.placeholder || 'watermark'"
@@ -236,16 +247,16 @@
                     </datalist>
                 </div>
 
-                <!-- PREVIEW BUTTON -->
-                <button @click="runPreview()" :disabled="!inputPath || previewLoading"
+                <!-- PREVIEW BUTTON (AI mode only) -->
+                <button x-show="detectionMode === 'ai'" x-transition @click="runPreview()" :disabled="!inputPath || previewLoading"
                         :data-tooltip="t.buttons?.preview_tooltip || ''"
                         class="w-full py-3 bg-neon-cyan/20 hover:bg-neon-cyan/40 text-neon-cyan border border-neon-cyan/50 rounded-xl font-bold transition-all disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                         :class="previewLoading ? 'animate-pulse' : ''">
                     <span x-text="previewLoading ? (t.buttons?.preview_loading || '🔄 Detecting...') : (t.buttons?.preview || '🔍 Preview')"></span>
                 </button>
 
-                <!-- Video Settings Section (only for video files) -->
-                <div x-show="isVideoFile(inputPath)" x-transition
+                <!-- Video Settings Section (only for video files, AI mode only) -->
+                <div x-show="isVideoFile(inputPath) && detectionMode === 'ai'" x-transition
                      class="space-y-3 p-3 bg-purple-900/20 rounded-xl border border-purple-500/30">
                     <div class="text-xs font-bold text-purple-400 uppercase flex items-center gap-2">
                         <span>🎬</span> <span x-text="t.video_settings?.title || 'Video Settings'"></span>
@@ -297,6 +308,26 @@
                         <option value="AVI" x-text="t.settings?.output_format?.avi || 'AVI'"></option>
                     </select>
                 </div>
+
+                <!-- Manual Mask Info (shown in manual mode) -->
+                <div x-show="detectionMode === 'manual'" x-transition
+                     class="space-y-2 p-3 bg-pink-900/20 rounded-xl border border-pink-500/30">
+                    <div class="text-xs font-bold text-pink-400 uppercase flex items-center gap-2">
+                        <span>✏️</span> <span x-text="t.detection_mode?.manual || 'Manual Mask'"></span>
+                    </div>
+                    <div class="text-[10px] text-gray-400" x-text="t.detection_mode?.draw_hint || 'Click and drag on the image to draw mask rectangles'"></div>
+                    <div class="flex items-center gap-2">
+                        <span class="text-xs font-mono text-neon-pink" x-text="manualMasks.length + ' ' + (t.detection_mode?.masks_count || 'rectangles drawn')"></span>
+                    </div>
+                    <div class="flex gap-2">
+                        <button @click="undoMask()" :disabled="manualMasks.length === 0"
+                                class="flex-1 py-1.5 bg-white/10 hover:bg-white/20 text-gray-300 rounded-lg text-xs font-bold transition-all disabled:opacity-30 disabled:cursor-not-allowed"
+                                x-text="t.detection_mode?.undo || 'Undo'"></button>
+                        <button @click="clearMasks()" :disabled="manualMasks.length === 0"
+                                class="flex-1 py-1.5 bg-white/10 hover:bg-white/20 text-gray-300 rounded-lg text-xs font-bold transition-all disabled:opacity-30 disabled:cursor-not-allowed"
+                                x-text="t.detection_mode?.clear || 'Clear All'"></button>
+                    </div>
+                </div>
             </div>
 
             <!-- START BUTTON -->
@@ -323,7 +354,9 @@
             <div class="flex-1 p-6 flex flex-col gap-4">
 
                 <!-- Input Box -->
-                <div @click="browseInput()"
+                <!-- Input Box (normal mode - AI mode or no manual image loaded) -->
+                <div x-show="!(detectionMode === 'manual' && inputPath && manualMaskImage)"
+                     @click="browseInput()"
                      class="border-2 border-dashed border-white/20 rounded-2xl flex-1 flex flex-col items-center justify-center p-8 transition-all hover:border-neon-green hover:bg-neon-green/5 group cursor-pointer relative overflow-hidden">
                     <template x-if="!inputPath">
                         <div class="text-center">
@@ -342,6 +375,31 @@
 
                     <!-- Background Grid Animation -->
                     <div class="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAiIGhlaWdodD0iMjAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGNpcmNsZSBjeD0iMSIgY3k9IjEiIHI9IjEiIGZpbGw9InJnYmEoMCwgMjU1LSAxMzYsIDAuMSkiLz48L3N2Zz4=')] opacity-20"></div>
+                </div>
+
+                <!-- Manual Mask Drawing Canvas (shown in manual mode with image loaded) -->
+                <div x-show="detectionMode === 'manual' && inputPath && manualMaskImage"
+                     x-transition
+                     class="border-2 border-solid border-neon-pink/40 rounded-2xl flex-1 flex flex-col items-center justify-center p-3 relative overflow-hidden bg-black/50">
+                    
+                    <div class="relative inline-block select-none" id="manual-mask-container">
+                        <img :src="'data:image/png;base64,' + manualMaskImage"
+                             id="manual-mask-img"
+                             class="max-w-full max-h-[350px] object-contain rounded-lg"
+                             @load="initCanvas()"
+                             draggable="false">
+                        <canvas id="manual-mask-canvas"
+                                @mousedown.prevent="startDrawing($event)"
+                                @mousemove.prevent="drawRect($event)"
+                                @mouseup.prevent="endDrawing($event)"
+                                @mouseleave="endDrawing($event)"
+                                class="absolute top-0 left-0 cursor-crosshair rounded-lg"
+                                style="pointer-events: auto;"></canvas>
+                    </div>
+
+                    <div class="flex items-center gap-3 mt-2">
+                        <button @click="browseInput()" class="text-xs text-gray-400 hover:text-neon-pink underline transition-colors" x-text="t.detection_mode?.change_file || 'Change File'"></button>
+                    </div>
                 </div>
 
                 <!-- Output Path Input -->
@@ -592,6 +650,18 @@
                 fadeIn: 0,
                 fadeOut: 0,
 
+                // Detection mode (ai or manual)
+                detectionMode: 'ai',
+
+                // Manual mask drawing state
+                manualMasks: [],        // [{x1, y1, x2, y2}] in original image coords
+                manualMaskImage: null,   // base64 thumbnail for canvas
+                manualMaskImageW: 0,     // original image width
+                manualMaskImageH: 0,     // original image height
+                isDrawing: false,
+                drawStartX: 0,
+                drawStartY: 0,
+
                 
                 async init() {
                     // Store reference for global Python callbacks
@@ -634,6 +704,7 @@
                             this.detectionSkip = config.detection_skip || 1;
                             this.fadeIn = config.fade_in || 0;
                             this.fadeOut = config.fade_out || 0;
+                            this.detectionMode = config.detection_mode || 'ai';
 
                             // Theme & Language (always load, use saved or pick random)
                             this.theme = config.theme || pickRandom(randomizableThemes);
@@ -756,6 +827,164 @@
                     return ['mp4', 'avi', 'mov', 'mkv', 'flv', 'wmv', 'webm'].includes(ext);
                 },
 
+                // Detection mode switching
+                switchDetectionMode(mode) {
+                    this.detectionMode = mode;
+                    this.saveConfigDebounced();
+                    if (mode === 'manual' && this.inputPath) {
+                        this.loadManualImage();
+                    } else if (mode === 'ai') {
+                        this.manualMaskImage = null;
+                        this.manualMasks = [];
+                    }
+                },
+
+                // Load image thumbnail for manual mask drawing
+                async loadManualImage() {
+                    if (!this.inputPath || this.detectionMode !== 'manual') return;
+                    if (!window.pywebview?.api?.get_image_thumbnail) return;
+
+                    this.manualMaskImage = null; // Show loading
+                    try {
+                        const result = await pywebview.api.get_image_thumbnail(this.inputPath);
+                        if (result && !result.error) {
+                            this.manualMaskImage = result.image;
+                            this.manualMaskImageW = result.width;
+                            this.manualMaskImageH = result.height;
+                            this.manualMasks = []; // Clear old masks for new image
+                            this.$nextTick(() => this.initCanvas());
+                        } else {
+                            this.addLogEntry('Failed to load image: ' + (result?.error || 'unknown'), 'text-error');
+                        }
+                    } catch (e) {
+                        this.addLogEntry('Failed to load image: ' + e.message, 'text-error');
+                    }
+                },
+
+                // Initialize the drawing canvas
+                initCanvas() {
+                    this.$nextTick(() => {
+                        const img = document.getElementById('manual-mask-img');
+                        const canvas = document.getElementById('manual-mask-canvas');
+                        if (!img || !canvas) return;
+
+                        if (img.naturalWidth === 0) {
+                            // Image not loaded yet, wait
+                            return;
+                        }
+
+                        canvas.width = img.clientWidth;
+                        canvas.height = img.clientHeight;
+                        canvas.style.width = img.clientWidth + 'px';
+                        canvas.style.height = img.clientHeight + 'px';
+                        this.redrawCanvas();
+                    });
+                },
+
+                // Start drawing a rectangle
+                startDrawing(e) {
+                    const canvas = document.getElementById('manual-mask-canvas');
+                    if (!canvas) return;
+                    const rect = canvas.getBoundingClientRect();
+                    this.isDrawing = true;
+                    this.drawStartX = e.clientX - rect.left;
+                    this.drawStartY = e.clientY - rect.top;
+                },
+
+                // Draw rectangle preview while dragging
+                drawRect(e) {
+                    if (!this.isDrawing) return;
+                    const canvas = document.getElementById('manual-mask-canvas');
+                    if (!canvas) return;
+                    const rect = canvas.getBoundingClientRect();
+                    const x = e.clientX - rect.left;
+                    const y = e.clientY - rect.top;
+
+                    this.redrawCanvas();
+
+                    const ctx = canvas.getContext('2d');
+                    ctx.strokeStyle = '#ff006e';
+                    ctx.lineWidth = 2;
+                    ctx.setLineDash([5, 5]);
+                    ctx.strokeRect(this.drawStartX, this.drawStartY, x - this.drawStartX, y - this.drawStartY);
+                    ctx.setLineDash([]);
+                    // Semi-transparent fill for preview
+                    ctx.fillStyle = 'rgba(255, 0, 110, 0.15)';
+                    ctx.fillRect(this.drawStartX, this.drawStartY, x - this.drawStartX, y - this.drawStartY);
+                },
+
+                // Finish drawing and save the rectangle
+                endDrawing(e) {
+                    if (!this.isDrawing) return;
+                    this.isDrawing = false;
+
+                    const canvas = document.getElementById('manual-mask-canvas');
+                    if (!canvas) return;
+                    const rect = canvas.getBoundingClientRect();
+                    const endX = Math.max(0, Math.min(e.clientX - rect.left, canvas.width));
+                    const endY = Math.max(0, Math.min(e.clientY - rect.top, canvas.height));
+
+                    // Convert canvas coords to original image coords
+                    const scaleX = this.manualMaskImageW / canvas.width;
+                    const scaleY = this.manualMaskImageH / canvas.height;
+
+                    const x1 = Math.round(Math.min(this.drawStartX, endX) * scaleX);
+                    const y1 = Math.round(Math.min(this.drawStartY, endY) * scaleY);
+                    const x2 = Math.round(Math.max(this.drawStartX, endX) * scaleX);
+                    const y2 = Math.round(Math.max(this.drawStartY, endY) * scaleY);
+
+                    // Only add if rectangle is big enough (at least 5px in image coords)
+                    if (Math.abs(x2 - x1) > 5 && Math.abs(y2 - y1) > 5) {
+                        this.manualMasks.push({ x1, y1, x2, y2 });
+                    }
+
+                    this.redrawCanvas();
+                },
+
+                // Redraw all saved rectangles on the canvas
+                redrawCanvas() {
+                    const canvas = document.getElementById('manual-mask-canvas');
+                    if (!canvas) return;
+                    const ctx = canvas.getContext('2d');
+                    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+                    const scaleX = canvas.width / this.manualMaskImageW;
+                    const scaleY = canvas.height / this.manualMaskImageH;
+
+                    this.manualMasks.forEach((mask, idx) => {
+                        const x = mask.x1 * scaleX;
+                        const y = mask.y1 * scaleY;
+                        const w = (mask.x2 - mask.x1) * scaleX;
+                        const h = (mask.y2 - mask.y1) * scaleY;
+
+                        // Semi-transparent fill
+                        ctx.fillStyle = 'rgba(255, 0, 110, 0.3)';
+                        ctx.fillRect(x, y, w, h);
+
+                        // Border
+                        ctx.strokeStyle = '#ff006e';
+                        ctx.lineWidth = 2;
+                        ctx.strokeRect(x, y, w, h);
+
+                        // Label
+                        ctx.fillStyle = '#ff006e';
+                        ctx.font = 'bold 11px monospace';
+                        ctx.fillText('#' + (idx + 1), x + 4, y + 14);
+                    });
+                },
+
+                // Undo last drawn mask
+                undoMask() {
+                    this.manualMasks.pop();
+                    this.redrawCanvas();
+                },
+
+                // Clear all drawn masks
+                clearMasks() {
+                    this.manualMasks = [];
+                    this.redrawCanvas();
+                },
+
                 async browseInput() {
                     const picker =
                         window.pywebview?.api?.browse_file ||
@@ -776,6 +1005,10 @@
                     if (path) {
                         this.inputPath = path;
                         this.saveConfigDebounced();
+                        // Load thumbnail for manual mode
+                        if (this.detectionMode === 'manual') {
+                            this.loadManualImage();
+                        }
                     }
                 },
 
@@ -795,6 +1028,12 @@
                 async startProcessing() {
                     if (!this.inputPath) {
                         this.addLogEntry(this.t.logs?.no_input || "No input selected. Please select a file first.", "text-error");
+                        return;
+                    }
+
+                    // Check for manual mode with no masks
+                    if (this.detectionMode === 'manual' && this.manualMasks.length === 0) {
+                        this.addLogEntry(this.t.detection_mode?.no_masks || "Draw at least one mask rectangle before processing.", "text-error");
                         return;
                     }
 
@@ -834,6 +1073,8 @@
                                 format: this.format,
                                 mode: this.mode,
                                 detection_prompt: this.detectionPrompt || 'watermark',
+                                detection_mode: this.detectionMode,
+                                manual_masks: this.detectionMode === 'manual' ? this.manualMasks : [],
                                 // Video settings
                                 detection_skip: parseInt(this.detectionSkip) || 1,
                                 fade_in: parseFloat(this.fadeIn) || 0,
@@ -975,6 +1216,7 @@
                         force_format: this.format,
                         mode: this.mode,
                         detection_prompt: this.detectionPrompt,
+                        detection_mode: this.detectionMode,
                         // Video settings
                         detection_skip: parseInt(this.detectionSkip) || 1,
                         fade_in: parseFloat(this.fadeIn) || 0,

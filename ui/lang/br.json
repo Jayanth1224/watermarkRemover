@@ -9,6 +9,20 @@
     "batch": "Arrastão (Formação de Quadrilha)",
     "batch_tooltip": "Roubar a marca d'água da pasta inteira. O bonde todo sem freio."
   },
+  "detection_mode": {
+    "label": "Modo de Detec\u00e7\u00e3o",
+    "ai": "\ud83e\udd16 IA Autom\u00e1tica",
+    "ai_tooltip": "A IA acha as marcas d'\u00e1gua sozinha. Confia.",
+    "manual": "\u270f\ufe0f Na M\u00e3o Mesmo",
+    "manual_tooltip": "Desenha os ret\u00e2ngulos tu mesmo, parceiro.",
+    "draw_hint": "Clica e arrasta pra desenhar",
+    "clear": "Limpar Tudo",
+    "undo": "Desfazer",
+    "change_file": "Trocar Arquivo",
+    "masks_count": "ret\u00e2ngulos desenhados",
+    "loading": "Carregando...",
+    "no_masks": "Desenha pelo menos um ret\u00e2ngulo antes, vacil\u00e3o."
+  },
   "settings": {
     "gaslight": {
       "label": "Passar a Perna (Sobrescrever)",

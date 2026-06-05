@@ -126,6 +126,22 @@ def get_watermark_mask(image: MatLike, model: Florence2ForConditionalGeneration,
     return mask
 
 
+def get_manual_mask(image_size, bboxes):
+    """Create a mask from manually specified bounding boxes.
+    
+    Args:
+        image_size: tuple (width, height) of the image
+        bboxes: list of [x1, y1, x2, y2] bounding boxes in pixel coordinates
+    """
+    mask = Image.new("L", image_size, 0)
+    draw = ImageDraw.Draw(mask)
+    for bbox in bboxes:
+        x1, y1, x2, y2 = map(int, bbox)
+        draw.rectangle([x1, y1, x2, y2], fill=255)
+    logger.info(f"Manual mask created with {len(bboxes)} region(s)")
+    return mask
+
+
 def detect_only(image: MatLike, model: Florence2ForConditionalGeneration, processor: AutoProcessor, device: str, max_bbox_percent: float, detection_prompt: str = "watermark"):
     """
     Detect watermarks and return bounding boxes WITHOUT creating mask or inpainting.
@@ -189,7 +205,7 @@ def is_video_file(file_path):
     video_extensions = ['.mp4', '.avi', '.mov', '.mkv', '.flv', '.wmv', '.webm']
     return Path(file_path).suffix.lower() in video_extensions
 
-def process_video(input_path, output_path, florence_model, florence_processor, model_manager, device, transparent, max_bbox_percent, force_format, detection_prompt="watermark", progress_offset=0, progress_scale=100):
+def process_video(input_path, output_path, florence_model, florence_processor, model_manager, device, transparent, max_bbox_percent, force_format, detection_prompt="watermark", progress_offset=0, progress_scale=100, manual_bboxes=None):
     """Process a video file by extracting frames, removing watermarks, and reconstructing the video"""
     cap = cv2.VideoCapture(str(input_path))
     if not cap.isOpened():
@@ -242,7 +258,10 @@ def process_video(input_path, output_path, florence_model, florence_processor, m
             pil_image = Image.fromarray(frame_rgb)
             
             # Get watermark mask
-            mask_image = get_watermark_mask(pil_image, florence_model, florence_processor, device, max_bbox_percent, detection_prompt)
+            if manual_bboxes:
+                mask_image = get_manual_mask(pil_image.size, manual_bboxes)
+            else:
+                mask_image = get_watermark_mask(pil_image, florence_model, florence_processor, device, max_bbox_percent, detection_prompt)
             
             # Process frame
             if transparent:
@@ -503,7 +522,7 @@ def process_video_two_pass(input_path, output_path, florence_model, florence_pro
     return output_file
 
 
-def handle_one(image_path: Path, output_path: Path, florence_model, florence_processor, model_manager, device, transparent, max_bbox_percent, force_format, overwrite, detection_prompt="watermark", detection_skip=1, fade_in=0.0, fade_out=0.0, progress_offset=0, progress_scale=100):
+def handle_one(image_path: Path, output_path: Path, florence_model, florence_processor, model_manager, device, transparent, max_bbox_percent, force_format, overwrite, detection_prompt="watermark", detection_skip=1, fade_in=0.0, fade_out=0.0, progress_offset=0, progress_scale=100, manual_mask_bboxes=None):
     # SAFETY: Never overwrite the input file
     if image_path.resolve() == output_path.resolve():
         logger.error(f"Cannot overwrite input file: {image_path}. Choose a different output path.")
@@ -516,6 +535,9 @@ def handle_one(image_path: Path, output_path: Path, florence_model, florence_pro
 
     # Check if it's a video file
     if is_video_file(image_path):
+        if manual_mask_bboxes:
+            # Manual mode: single pass with fixed mask on every frame
+            return process_video(image_path, output_path, florence_model, florence_processor, model_manager, device, transparent, max_bbox_percent, force_format, detection_prompt, progress_offset, progress_scale, manual_bboxes=manual_mask_bboxes)
         # Use two-pass if detection_skip > 1 or fade handling is needed
         use_two_pass = detection_skip > 1 or fade_in > 0 or fade_out > 0
         if use_two_pass:
@@ -525,7 +547,10 @@ def handle_one(image_path: Path, output_path: Path, florence_model, florence_pro
 
     # Process image
     image = Image.open(image_path).convert("RGB")
-    mask_image = get_watermark_mask(image, florence_model, florence_processor, device, max_bbox_percent, detection_prompt)
+    if manual_mask_bboxes:
+        mask_image = get_manual_mask(image.size, manual_mask_bboxes)
+    else:
+        mask_image = get_watermark_mask(image, florence_model, florence_processor, device, max_bbox_percent, detection_prompt)
 
     if transparent:
         result_image = make_region_transparent(image, mask_image)
@@ -570,7 +595,8 @@ def handle_one(image_path: Path, output_path: Path, florence_model, florence_pro
 @click.option("--detection-skip", default=1, type=int, help="Detect watermarks every N frames for videos (1-10). Higher = faster but may miss brief watermarks.")
 @click.option("--fade-in", default=0.0, type=float, help="Extend mask backwards by N seconds to handle fade-in watermarks.")
 @click.option("--fade-out", default=0.0, type=float, help="Extend mask forwards by N seconds to handle fade-out watermarks.")
-def main(input_path: str, output_path: str, preview: bool, overwrite: bool, transparent: bool, max_bbox_percent: float, force_format: str, detection_prompt: str, detection_skip: int, fade_in: float, fade_out: float):
+@click.option("--manual-mask", default=None, type=str, help="JSON string of manual mask bounding boxes [[x1,y1,x2,y2],...]. Skips AI detection when provided.")
+def main(input_path: str, output_path: str, preview: bool, overwrite: bool, transparent: bool, max_bbox_percent: float, force_format: str, detection_prompt: str, detection_skip: int, fade_in: float, fade_out: float, manual_mask: str):
     # Input validation
     if detection_skip < 1 or detection_skip > 10:
         logger.warning(f"detection_skip must be 1-10, got {detection_skip}. Using 1.")
@@ -666,18 +692,37 @@ def main(input_path: str, output_path: str, preview: bool, overwrite: bool, tran
     # ========== NORMAL PROCESSING MODE ==========
     output_path = Path(output_path)
 
+    # Parse manual mask if provided
+    manual_mask_bboxes = None
+    if manual_mask:
+        try:
+            import json as json_module
+            manual_mask_bboxes = json_module.loads(manual_mask)
+            logger.info(f"Manual mask mode: {len(manual_mask_bboxes)} bounding box(es) provided")
+            print(f"Manual mask mode: skipping AI detection, using {len(manual_mask_bboxes)} user-defined region(s)")
+        except (json.JSONDecodeError, ValueError) as e:
+            logger.error(f"Invalid manual mask JSON: {e}")
+            print(f"ERROR: Invalid manual mask format. Expected JSON like [[x1,y1,x2,y2],...]")
+            return
+
     device = "cuda" if torch.cuda.is_available() else "cpu"
     print(f"Using device: {device}")
 
-    # Force no dtype for CUDA (intentional default)
-    # Apply float32 for CPU (compatibility)
-    model_dtype = torch.float32 if device == "cpu" else None
+    # Load Florence-2 only if NOT in manual mask mode
+    if manual_mask_bboxes:
+        florence_model = None
+        florence_processor = None
+        logger.info("Manual mask mode: skipping Florence-2 model loading")
+    else:
+        # Force no dtype for CUDA (intentional default)
+        # Apply float32 for CPU (compatibility)
+        model_dtype = torch.float32 if device == "cpu" else None
 
-    florence_model = Florence2ForConditionalGeneration.from_pretrained(
-        "florence-community/Florence-2-large",
-        torch_dtype=model_dtype).to(device).eval()
-    florence_processor = AutoProcessor.from_pretrained("florence-community/Florence-2-large")
-    logger.info("Florence-2 Model loaded")
+        florence_model = Florence2ForConditionalGeneration.from_pretrained(
+            "florence-community/Florence-2-large",
+            torch_dtype=model_dtype).to(device).eval()
+        florence_processor = AutoProcessor.from_pretrained("florence-community/Florence-2-large")
+        logger.info("Florence-2 Model loaded")
 
     if not transparent:
         model_manager = load_lama_model(device)
@@ -700,7 +745,7 @@ def main(input_path: str, output_path: str, preview: bool, overwrite: bool, tran
             # Calculate progress range for this file
             progress_offset = int(idx / total_files * 100)
             progress_scale = int(100 / total_files)
-            handle_one(file_path, output_file, florence_model, florence_processor, model_manager, device, transparent, max_bbox_percent, force_format, overwrite, detection_prompt, detection_skip, fade_in, fade_out, progress_offset, progress_scale)
+            handle_one(file_path, output_file, florence_model, florence_processor, model_manager, device, transparent, max_bbox_percent, force_format, overwrite, detection_prompt, detection_skip, fade_in, fade_out, progress_offset, progress_scale, manual_mask_bboxes=manual_mask_bboxes)
     else:
         # Single file mode - if output is a directory, construct file path
         if output_path.is_dir():
@@ -715,7 +760,7 @@ def main(input_path: str, output_path: str, preview: bool, overwrite: bool, tran
             else:
                 output_file = output_file.with_suffix(".mp4")  # Default to mp4
 
-        handle_one(input_path, output_file, florence_model, florence_processor, model_manager, device, transparent, max_bbox_percent, force_format, overwrite, detection_prompt, detection_skip, fade_in, fade_out)
+        handle_one(input_path, output_file, florence_model, florence_processor, model_manager, device, transparent, max_bbox_percent, force_format, overwrite, detection_prompt, detection_skip, fade_in, fade_out, manual_mask_bboxes=manual_mask_bboxes)
         print(f"input_path:{input_path}, output_path:{output_file}, overall_progress:100")
 
 if __name__ == "__main__":

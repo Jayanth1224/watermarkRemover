@@ -9,6 +9,20 @@
     "batch": "Batch (Folder)",
     "batch_tooltip": "Process all images/videos in a folder at once."
   },
+  "detection_mode": {
+    "label": "Detection Mode",
+    "ai": "\ud83e\udd16 AI Detection",
+    "ai_tooltip": "Automatically detect watermarks using AI (Florence-2 model).",
+    "manual": "\u270f\ufe0f Manual Mask",
+    "manual_tooltip": "Draw rectangles on the image to mark watermark areas manually.",
+    "draw_hint": "Click and drag to draw mask rectangles",
+    "clear": "Clear All",
+    "undo": "Undo",
+    "change_file": "Change File",
+    "masks_count": "rectangles drawn",
+    "loading": "Loading image...",
+    "no_masks": "Draw at least one mask rectangle before processing."
+  },
   "settings": {
     "gaslight": {
       "label": "Overwrite Files",

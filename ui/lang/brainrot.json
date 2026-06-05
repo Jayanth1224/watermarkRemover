@@ -9,6 +9,20 @@
     "batch": "NPC Horde",
     "batch_tooltip": "Yeet an entire folder of NPCs at once. Mass ratio."
   },
+  "detection_mode": {
+    "label": "How We Rolling",
+    "ai": "\ud83e\udd16 AI Diff",
+    "ai_tooltip": "Let the AI find the opps (watermarks) automatically.",
+    "manual": "\u270f\ufe0f DIY Mode",
+    "manual_tooltip": "Draw the hitbox yourself. Trust no AI.",
+    "draw_hint": "Click and drag to mark the opp",
+    "clear": "Nuke All",
+    "undo": "Take it Back",
+    "change_file": "Swap Loot",
+    "masks_count": "hitboxes drawn",
+    "loading": "Loading up...",
+    "no_masks": "Draw a hitbox first, dummy."
+  },
   "settings": {
     "gaslight": {
       "label": "Gaslight Files",

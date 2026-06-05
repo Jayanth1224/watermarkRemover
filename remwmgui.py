@@ -27,6 +27,7 @@ import json
 import yaml
 import base64
 from pathlib import Path
+from io import BytesIO
 
 # Only psutil for system info (lightweight)
 try:
@@ -115,6 +116,58 @@ class Api:
 
         result = self.window.create_file_dialog(webview.FileDialog.FOLDER)
         return result[0] if result else None
+
+    def _is_video_file(self, path):
+        """Check if a file is a video based on extension"""
+        if not path:
+            return False
+        ext = os.path.splitext(path)[1].lower()
+        return ext in ['.mp4', '.avi', '.mov', '.mkv', '.flv', '.wmv', '.webm']
+
+    def get_image_thumbnail(self, path):
+        """Load image/video frame and return as base64 thumbnail for manual mask drawing."""
+        if not path or not os.path.exists(path):
+            return {'error': 'File not found'}
+
+        try:
+            from PIL import Image
+
+            if self._is_video_file(path):
+                import cv2
+                import numpy as np
+                cap = cv2.VideoCapture(path)
+                total = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+                # Get frame from middle of video
+                cap.set(cv2.CAP_PROP_POS_FRAMES, max(0, total // 2))
+                ret, frame = cap.read()
+                cap.release()
+                if not ret:
+                    return {'error': 'Could not read video frame'}
+                pil_image = Image.fromarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
+            else:
+                pil_image = Image.open(path).convert('RGB')
+
+            orig_w, orig_h = pil_image.size
+
+            # Resize for display (max 800px on longest side)
+            max_dim = 800
+            ratio = min(max_dim / orig_w, max_dim / orig_h)
+            if ratio < 1:
+                new_size = (int(orig_w * ratio), int(orig_h * ratio))
+                pil_image = pil_image.resize(new_size, Image.LANCZOS)
+
+            # Convert to base64
+            buffer = BytesIO()
+            pil_image.save(buffer, format='PNG')
+            img_base64 = base64.b64encode(buffer.getvalue()).decode('utf-8')
+
+            return {
+                'image': img_base64,
+                'width': orig_w,
+                'height': orig_h
+            }
+        except Exception as e:
+            return {'error': str(e)}
 
     def _would_overwrite_input(self, input_path, output_path):
         """Check if output would overwrite the input file."""
@@ -278,6 +331,7 @@ class Api:
             'detection_skip': detection_skip,
             'fade_in': fade_in,
             'fade_out': fade_out,
+            'detection_mode': settings.get('detection_mode', 'ai'),
             'theme': settings.get('theme', 'brainrot'),
             'lang': settings.get('lang', 'brainrot')
         })
@@ -309,6 +363,14 @@ class Api:
 
         if fade_out and float(fade_out) > 0:
             cmd.append(f'--fade-out={float(fade_out)}')
+
+        # Manual mask mode
+        detection_mode = settings.get('detection_mode', 'ai')
+        manual_masks = settings.get('manual_masks', [])
+        if detection_mode == 'manual' and manual_masks:
+            # Convert manual masks to JSON bboxes: [[x1,y1,x2,y2], ...]
+            bboxes = [[m['x1'], m['y1'], m['x2'], m['y2']] for m in manual_masks]
+            cmd.append(f'--manual-mask={json.dumps(bboxes)}')
 
         # Start processing in background thread
         self.is_running = True

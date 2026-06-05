@@ -9,6 +9,20 @@
     "batch": "La Mif (Toute l'équipe)",
     "batch_tooltip": "Traite tout le dossier d'un coup, c'est carré."
   },
+  "detection_mode": {
+    "label": "Mode de d\u00e9tection",
+    "ai": "\ud83e\udd16 D\u00e9tection IA",
+    "ai_tooltip": "L'IA trouve les watermarks automatiquement.",
+    "manual": "\u270f\ufe0f Mode Manuel",
+    "manual_tooltip": "Dessine les zones de watermark toi-m\u00eame, fr\u00e9rot.",
+    "draw_hint": "Clique et glisse pour dessiner",
+    "clear": "Tout effacer",
+    "undo": "Annuler",
+    "change_file": "Changer de fichier",
+    "masks_count": "rectangles dessin\u00e9s",
+    "loading": "Chargement...",
+    "no_masks": "Dessine au moins un rectangle avant de lancer, wesh."
+  },
   "settings": {
     "gaslight": {
       "label": "Force le passage",
