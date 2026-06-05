@@ -56,6 +56,12 @@
   },
   "video_settings": {
     "title": "视频那个事",
+    "model": {
+      "label": "修图师",
+      "tooltip": "LaMA速度快但可能闪烁。ProPainter超稳但慢得像老爷爷。",
+      "lama": "⚡ 快男 (LaMA)",
+      "propainter": "🎥 慢工出细活 (ProPainter)"
+    },
     "detection_skip": {
       "label": "摸鱼频率",
       "unit": "帧",

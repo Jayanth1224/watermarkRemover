@@ -56,6 +56,12 @@
   },
   "video_settings": {
     "title": "Réglages du Binks",
+    "model": {
+      "label": "Modèle d'Inpainting",
+      "tooltip": "LaMA est rapide mais peut bégayer. ProPainter est super propre mais hyper long.",
+      "lama": "⚡ Rapide comme le TMAX (LaMA)",
+      "propainter": "🎥 Qualité Cité (ProPainter)"
+    },
     "detection_skip": {
       "label": "Skip ça (Flemme)",
       "unit": "frames",

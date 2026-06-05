@@ -332,6 +332,7 @@ class Api:
             'fade_in': fade_in,
             'fade_out': fade_out,
             'detection_mode': settings.get('detection_mode', 'ai'),
+            'video_model': settings.get('video_model', 'lama'),
             'theme': settings.get('theme', 'brainrot'),
             'lang': settings.get('lang', 'brainrot')
         })
@@ -363,6 +364,10 @@ class Api:
 
         if fade_out and float(fade_out) > 0:
             cmd.append(f'--fade-out={float(fade_out)}')
+
+        video_model = settings.get('video_model', 'lama')
+        if video_model == 'propainter':
+            cmd.append('--video-model=propainter')
 
         # Manual mask mode
         detection_mode = settings.get('detection_mode', 'ai')

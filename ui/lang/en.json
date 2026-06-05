@@ -56,6 +56,12 @@
   },
   "video_settings": {
     "title": "Video Settings",
+    "model": {
+      "label": "Inpainting Model",
+      "tooltip": "LaMA is fast but can cause flickering in video. ProPainter ensures smooth videos but takes much longer.",
+      "lama": "⚡ Fast (LaMA)",
+      "propainter": "🎥 High Quality (ProPainter)"
+    },
     "detection_skip": {
       "label": "Detection Skip",
       "unit": "frames",

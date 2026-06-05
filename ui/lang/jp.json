@@ -56,6 +56,12 @@
   },
   "video_settings": {
     "title": "動画のお時間 📹",
+    "model": {
+      "label": "修正モデル",
+      "tooltip": "LaMAは速いがチラつく。ProPainterは滑らかだが時間がかかる。",
+      "lama": "⚡ 早漏 (LaMA)",
+      "propainter": "🎥 遅漏で濃厚 (ProPainter)"
+    },
     "detection_skip": {
       "label": "パンチラ検知間隔",
       "unit": "コマ",

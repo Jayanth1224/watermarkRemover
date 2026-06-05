@@ -521,8 +521,79 @@ def process_video_two_pass(input_path, output_path, florence_model, florence_pro
     logger.info(f"input_path:{input_path}, output_path:{output_file}, overall_progress:{final_progress}")
     return output_file
 
+def process_video_with_propainter_pipeline(input_path, output_path, florence_model, florence_processor, device, transparent, max_bbox_percent, force_format, detection_prompt="watermark", detection_skip=1, fade_in_sec=0.0, fade_out_sec=0.0, manual_bboxes=None):
+    from propainter_wrapper import process_video_propainter
+    
+    cap = cv2.VideoCapture(str(input_path))
+    if not cap.isOpened():
+        logger.error(f"Error opening video file: {input_path}")
+        return
 
-def handle_one(image_path: Path, output_path: Path, florence_model, florence_processor, model_manager, device, transparent, max_bbox_percent, force_format, overwrite, detection_prompt="watermark", detection_skip=1, fade_in=0.0, fade_out=0.0, progress_offset=0, progress_scale=100, manual_mask_bboxes=None):
+    fps = cap.get(cv2.CAP_PROP_FPS)
+    width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+    height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+
+    if force_format:
+        output_format = force_format.upper()
+    else:
+        output_format = "MP4"
+
+    output_path = Path(output_path)
+    if output_path.is_dir():
+        output_file = output_path / f"{input_path.stem}_no_watermark.{output_format.lower()}"
+    else:
+        output_file = output_path.with_suffix(f".{output_format.lower()}")
+
+    # Extract all frames
+    frames_pil = []
+    logger.info("Extracting frames...")
+    while cap.isOpened():
+        ret, frame = cap.read()
+        if not ret: break
+        frames_pil.append(Image.fromarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)))
+    cap.release()
+
+    if not frames_pil: return
+
+    # Generate masks
+    masks_pil = []
+    if manual_bboxes:
+        mask = get_manual_mask((width, height), manual_bboxes)
+        masks_pil = [mask] * len(frames_pil)
+    else:
+        logger.info("Detecting watermarks (Sparse mode not supported for ProPainter yet, processing all frames)...")
+        for f in tqdm.tqdm(frames_pil, desc="Mask Detection"):
+            masks_pil.append(get_watermark_mask(f, florence_model, florence_processor, device, max_bbox_percent, detection_prompt))
+            
+    # Run ProPainter
+    logger.info("Running ProPainter Inference...")
+    out_frames = process_video_propainter(frames_pil, masks_pil, device)
+    
+    # Save video
+    temp_dir = tempfile.mkdtemp()
+    temp_video_path = Path(temp_dir) / f"temp_no_audio.{output_format.lower()}"
+    
+    fourcc = cv2.VideoWriter_fourcc(*'mp4v') if output_format == 'MP4' else cv2.VideoWriter_fourcc(*'XVID')
+    out = cv2.VideoWriter(str(temp_video_path), fourcc, fps, (width, height))
+    for f in out_frames:
+        out.write(cv2.cvtColor(f, cv2.COLOR_RGB2BGR))
+    out.release()
+    
+    # Merge Audio
+    try:
+        subprocess.run(["ffmpeg", "-y", "-i", str(temp_video_path), "-i", str(input_path), "-c:v", "copy", "-c:a", "aac", "-map", "0:v:0", "-map", "1:a:0", "-shortest", str(output_file)], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    except:
+        shutil.copy(str(temp_video_path), str(output_file))
+    finally:
+        try:
+            os.remove(str(temp_video_path))
+            os.rmdir(temp_dir)
+        except: pass
+        
+    return output_file
+
+def handle_one(image_path: Path, output_path: Path, florence_model, florence_processor, model_manager, device, transparent, max_bbox_percent, force_format, overwrite, detection_prompt="watermark", detection_skip=1, fade_in=0.0, fade_out=0.0, progress_offset=0, progress_scale=100, manual_mask_bboxes=None, video_model="lama"):
     # SAFETY: Never overwrite the input file
     if image_path.resolve() == output_path.resolve():
         logger.error(f"Cannot overwrite input file: {image_path}. Choose a different output path.")
@@ -535,6 +606,10 @@ def handle_one(image_path: Path, output_path: Path, florence_model, florence_pro
 
     # Check if it's a video file
     if is_video_file(image_path):
+        if video_model == "propainter":
+            logger.info("Routing video to ProPainter pipeline...")
+            return process_video_with_propainter_pipeline(image_path, output_path, florence_model, florence_processor, device, transparent, max_bbox_percent, force_format, detection_prompt, detection_skip, fade_in, fade_out, manual_mask_bboxes)
+
         if manual_mask_bboxes:
             # Manual mode: single pass with fixed mask on every frame
             return process_video(image_path, output_path, florence_model, florence_processor, model_manager, device, transparent, max_bbox_percent, force_format, detection_prompt, progress_offset, progress_scale, manual_bboxes=manual_mask_bboxes)
@@ -596,7 +671,8 @@ def handle_one(image_path: Path, output_path: Path, florence_model, florence_pro
 @click.option("--fade-in", default=0.0, type=float, help="Extend mask backwards by N seconds to handle fade-in watermarks.")
 @click.option("--fade-out", default=0.0, type=float, help="Extend mask forwards by N seconds to handle fade-out watermarks.")
 @click.option("--manual-mask", default=None, type=str, help="JSON string of manual mask bounding boxes [[x1,y1,x2,y2],...]. Skips AI detection when provided.")
-def main(input_path: str, output_path: str, preview: bool, overwrite: bool, transparent: bool, max_bbox_percent: float, force_format: str, detection_prompt: str, detection_skip: int, fade_in: float, fade_out: float, manual_mask: str):
+@click.option("--video-model", default="lama", type=click.Choice(["lama", "propainter"]), help="Inpainting model to use for videos.")
+def main(input_path: str, output_path: str, preview: bool, overwrite: bool, transparent: bool, max_bbox_percent: float, force_format: str, detection_prompt: str, detection_skip: int, fade_in: float, fade_out: float, manual_mask: str, video_model: str):
     # Input validation
     if detection_skip < 1 or detection_skip > 10:
         logger.warning(f"detection_skip must be 1-10, got {detection_skip}. Using 1.")
@@ -745,7 +821,7 @@ def main(input_path: str, output_path: str, preview: bool, overwrite: bool, tran
             # Calculate progress range for this file
             progress_offset = int(idx / total_files * 100)
             progress_scale = int(100 / total_files)
-            handle_one(file_path, output_file, florence_model, florence_processor, model_manager, device, transparent, max_bbox_percent, force_format, overwrite, detection_prompt, detection_skip, fade_in, fade_out, progress_offset, progress_scale, manual_mask_bboxes=manual_mask_bboxes)
+            handle_one(file_path, output_file, florence_model, florence_processor, model_manager, device, transparent, max_bbox_percent, force_format, overwrite, detection_prompt, detection_skip, fade_in, fade_out, progress_offset, progress_scale, manual_mask_bboxes=manual_mask_bboxes, video_model=video_model)
     else:
         # Single file mode - if output is a directory, construct file path
         if output_path.is_dir():

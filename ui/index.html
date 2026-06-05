@@ -262,6 +262,15 @@
                         <span>🎬</span> <span x-text="t.video_settings?.title || 'Video Settings'"></span>
                     </div>
 
+                    <!-- Inpainting Model Selector -->
+                    <div class="space-y-1">
+                        <label class="text-[10px] text-gray-400 uppercase cursor-help" :data-tooltip="t.video_settings?.model?.tooltip || ''" x-text="t.video_settings?.model?.label || 'Inpainting Model'"></label>
+                        <select x-model="videoModel" @change="saveConfigDebounced()" class="w-full bg-black border border-purple-500/30 text-white text-xs rounded-lg p-2 focus:border-purple-500 outline-none">
+                            <option value="lama" x-text="t.video_settings?.model?.lama || '⚡ Fast (LaMA)'"></option>
+                            <option value="propainter" x-text="t.video_settings?.model?.propainter || '🎥 High Quality (ProPainter)'"></option>
+                        </select>
+                    </div>
+
                     <!-- Detection Skip Slider -->
                     <div class="space-y-1">
                         <div class="flex justify-between text-xs font-mono">
@@ -646,6 +655,7 @@
                 previewError: null,
 
                 // Video settings (two-pass processing)
+                videoModel: 'lama',
                 detectionSkip: 1,
                 fadeIn: 0,
                 fadeOut: 0,
@@ -705,6 +715,7 @@
                             this.fadeIn = config.fade_in || 0;
                             this.fadeOut = config.fade_out || 0;
                             this.detectionMode = config.detection_mode || 'ai';
+                            this.videoModel = config.video_model || 'lama';
 
                             // Theme & Language (always load, use saved or pick random)
                             this.theme = config.theme || pickRandom(randomizableThemes);
@@ -1221,6 +1232,7 @@
                         detection_skip: parseInt(this.detectionSkip) || 1,
                         fade_in: parseFloat(this.fadeIn) || 0,
                         fade_out: parseFloat(this.fadeOut) || 0,
+                        video_model: this.videoModel,
                         // Theme & Language
                         theme: this.theme,
                         lang: this.lang

@@ -56,6 +56,12 @@
   },
   "video_settings": {
     "title": "Skibidi Settings",
+    "model": {
+      "label": "Paint Job",
+      "tooltip": "LaMA is speedrun but might glitch. ProPainter is cinematic rizz but takes forever to cook.",
+      "lama": "⚡ Speedrun (LaMA)",
+      "propainter": "🎥 Cinematic Rizz (ProPainter)"
+    },
     "detection_skip": {
       "label": "Lazy Mode (Skip)",
       "unit": "ticks",

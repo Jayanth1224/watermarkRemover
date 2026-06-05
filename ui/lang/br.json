@@ -56,6 +56,12 @@
   },
   "video_settings": {
     "title": "Configurações da Câmera de Segurança",
+    "model": {
+      "label": "Tinta Pro Crime",
+      "tooltip": "LaMA é The Flash mas pode dar BO (piscar). ProPainter é liso mas demora uma eternidade.",
+      "lama": "⚡ The Flash (LaMA)",
+      "propainter": "🎥 Padrão Ouro (ProPainter)"
+    },
     "detection_skip": {
       "label": "Pular Quadros (Preguiça)",
       "unit": "frames",
