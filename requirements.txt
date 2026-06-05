@@ -26,6 +26,6 @@ tqdm
 psutil
 pyyaml
 
-# qt and gtk gui
-PyGObject
-qtpy
+# GUI backends (platform-specific)
+PyGObject; sys_platform == 'linux'
+qtpy; sys_platform == 'linux'
